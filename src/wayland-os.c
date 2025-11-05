@@ -147,7 +147,7 @@ wl_os_socket_peercred(int sockfd, uid_t *uid, gid_t *gid, pid_t *pid)
 	*pid = ucred.pid;
 	return 0;
 }
-#elif defined(HAVE_GETPEEREID) && defined(LOCAL_PEERPID)
+#elif defined(HAVE_GETPEEREID)
 int
 wl_os_socket_peercred(int sockfd, uid_t *uid, gid_t *gid, pid_t *pid)
 {
@@ -158,9 +158,11 @@ wl_os_socket_peercred(int sockfd, uid_t *uid, gid_t *gid, pid_t *pid)
 	}
 
 	len = sizeof(pid_t);
+#ifdef LOCAL_PEERPID
 	if (getsockopt(sockfd, SOL_LOCAL, LOCAL_PEERPID, pid, &len) != 0) {
 		return -1;
 	}
+#endif
 	return 0;
 }
 #else
