@@ -41,6 +41,10 @@
 #include <poll.h>
 #include <pthread.h>
 
+#ifdef __APPLE__
+#include <epoll-shim/detail/poll.h>
+#endif
+
 #include "wayland-util.h"
 #include "wayland-os.h"
 #include "wayland-client.h"
