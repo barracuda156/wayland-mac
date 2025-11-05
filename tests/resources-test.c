@@ -244,7 +244,7 @@ TEST(resource_destroy_iteration)
 		.notify = &resource_destroy_notify
 	};
 
-	assert(socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, s) == 0);
+	assert(wl_os_socketpair_cloexec(AF_UNIX, SOCK_STREAM, 0, s) == 0);
 	display = wl_display_create();
 	assert(display);
 	client = wl_client_create(display, s[0]);
