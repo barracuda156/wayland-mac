@@ -38,12 +38,29 @@
 #include <sys/signalfd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
+
 #include "timespec-util.h"
+
+#include "../config.h"
+
 #include "wayland-util.h"
 #include "wayland-private.h"
 #include "wayland-server-core.h"
 #include "wayland-server-private.h"
 #include "wayland-os.h"
+
+#ifdef HAVE_SIGNALFD
+#include <sys/signalfd.h>
+#endif
+#ifdef HAVE_TIMERFD
+#include <sys/timerfd.h>
+#endif
+#if !defined(HAVE_ITIMERSPEC) && !defined(COMPAT_ENABLE_ITIMERSPEC)
+struct itimerspec {
+	struct timespec it_interval;
+	struct timespec it_value;
+};
+#endif
 
 /** \cond INTERNAL */
 
@@ -76,7 +93,9 @@ struct wl_event_loop {
 
 	struct wl_priv_signal destroy_signal;
 
+#ifdef HAVE_TIMERFD
 	struct wl_timer_heap timers;
+#endif
 };
 
 struct wl_event_source_interface {
@@ -105,10 +124,14 @@ wl_event_source_fd_dispatch(struct wl_event_source *source,
 		mask |= WL_EVENT_READABLE;
 	if (ep->events & EPOLLOUT)
 		mask |= WL_EVENT_WRITABLE;
+#ifdef EPOLLHUP
 	if (ep->events & EPOLLHUP)
 		mask |= WL_EVENT_HANGUP;
+#endif
+#ifdef EPOLLERR
 	if (ep->events & EPOLLERR)
 		mask |= WL_EVENT_ERROR;
+#endif
 
 	return fd_source->func(fd_source->fd, mask, source->data);
 }
@@ -227,6 +250,8 @@ wl_event_source_fd_update(struct wl_event_source *source, uint32_t mask)
 
 	return epoll_ctl(loop->epoll_fd, EPOLL_CTL_MOD, source->fd, &ep);
 }
+
+#ifdef HAVE_TIMERFD
 
 /** \cond INTERNAL */
 
@@ -661,6 +686,10 @@ wl_event_source_timer_update(struct wl_event_source *source, int ms_delay)
 	return 0;
 }
 
+#endif /* HAVE_TIMERFD */
+
+#ifdef HAVE_SIGNALFD
+
 /** \cond INTERNAL */
 
 struct wl_event_source_signal {
@@ -737,6 +766,8 @@ wl_event_loop_add_signal(struct wl_event_loop *loop,
 
 	return add_source(loop, &source->base, WL_EVENT_READABLE, data);
 }
+
+#endif /* HAVE_SIGNALFD */
 
 /** \cond INTERNAL */
 
@@ -841,6 +872,7 @@ wl_event_source_remove(struct wl_event_source *source)
 		source->fd = -1;
 	}
 
+#ifdef HAVE_TIMERFD
 	if (source->interface == &timer_source_interface &&
 	    source->fd != TIMER_REMOVED) {
 		/* Disarm the timer (and the loop's timerfd, if necessary),
@@ -851,6 +883,7 @@ wl_event_source_remove(struct wl_event_source *source)
 		 * be dispatched in `wl_event_loop_dispatch` */
 		source->fd = TIMER_REMOVED;
 	}
+#endif
 
 	wl_list_remove(&source->link);
 	wl_list_insert(&loop->destroy_list, &source->link);
@@ -903,7 +936,9 @@ wl_event_loop_create(void)
 
 	wl_priv_signal_init(&loop->destroy_signal);
 
+#ifdef HAVE_TIMERFD
 	wl_timer_heap_init(&loop->timers, loop);
+#endif
 
 	return loop;
 }
@@ -927,7 +962,9 @@ wl_event_loop_destroy(struct wl_event_loop *loop)
 	wl_priv_signal_final_emit(&loop->destroy_signal, loop);
 
 	wl_event_loop_process_destroy_list(loop);
+#ifdef HAVE_TIMERFD
 	wl_timer_heap_release(&loop->timers);
+#endif
 	close(loop->epoll_fd);
 	free(loop);
 }
@@ -1000,7 +1037,9 @@ wl_event_loop_dispatch(struct wl_event_loop *loop, int timeout)
 	struct epoll_event ep[32];
 	struct wl_event_source *source;
 	int i, count;
+#ifdef HAVE_TIMERFD
 	bool has_timers = false;
+#endif
 	bool use_timeout = timeout > 0;
 	struct timespec now;
 	struct timespec deadline = {0};
@@ -1035,6 +1074,7 @@ wl_event_loop_dispatch(struct wl_event_loop *loop, int timeout)
 	if (count < 0)
 		return -1;
 
+#ifdef HAVE_TIMERFD
 	for (i = 0; i < count; i++) {
 		source = ep[i].data.ptr;
 		if (source == &loop->timers.base) {
@@ -1052,6 +1092,7 @@ wl_event_loop_dispatch(struct wl_event_loop *loop, int timeout)
 		if (wl_timer_heap_dispatch(&loop->timers) < 0)
 			return -1;
 	}
+#endif
 
 	for (i = 0; i < count; i++) {
 		source = ep[i].data.ptr;

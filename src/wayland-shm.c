@@ -30,7 +30,7 @@
 
 #define _GNU_SOURCE
 
-#include "config.h"
+#include "../config.h"
 
 #include <stdbool.h>
 #include <stdio.h>
