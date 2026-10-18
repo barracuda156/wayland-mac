@@ -29,6 +29,44 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+/*
+ * In 64-bit builds the 10.5 SDK computes every CMSG_ macro with 8-byte
+ * alignment, padding struct cmsghdr to 16 bytes, while the 32-bit 10.5
+ * kernel lays control messages out with 4-byte alignment (a 12-byte
+ * header), which is also what the 10.6 and later SDKs assume. For
+ * a single fd CMSG_LEN() then yields 20 instead of 16, the kernel reads
+ * two fds -- the real one plus 4 bytes of uninitialized padding -- and
+ * sendmsg() fails with EBADF. MacPorts legacy-support only corrects
+ * CMSG_DATA, so substitute the 10.6 definitions for all of them.
+ */
+#if defined(__APPLE__) && defined(__LP64__)
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1060
+
+#define WL_CMSG_ALIGN32(n) (((size_t)(n) + 3) & ~(size_t)3)
+
+#undef CMSG_DATA
+#undef CMSG_NXTHDR
+#undef CMSG_SPACE
+#undef CMSG_LEN
+
+#define CMSG_DATA(cmsg) \
+	((unsigned char *)(cmsg) + WL_CMSG_ALIGN32(sizeof(struct cmsghdr)))
+#define CMSG_NXTHDR(mhdr, cmsg) \
+	(((unsigned char *)(cmsg) + WL_CMSG_ALIGN32((cmsg)->cmsg_len) + \
+	  WL_CMSG_ALIGN32(sizeof(struct cmsghdr)) > \
+	  (unsigned char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
+	 (struct cmsghdr *)0 : \
+	 (struct cmsghdr *)((unsigned char *)(cmsg) + \
+			    WL_CMSG_ALIGN32((cmsg)->cmsg_len)))
+#define CMSG_SPACE(l) \
+	(WL_CMSG_ALIGN32(sizeof(struct cmsghdr)) + WL_CMSG_ALIGN32(l))
+#define CMSG_LEN(l) \
+	(WL_CMSG_ALIGN32(sizeof(struct cmsghdr)) + (l))
+
+#endif
+#endif
+
 int
 wl_os_socket_cloexec(int domain, int type, int protocol);
 
