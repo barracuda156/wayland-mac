@@ -28,9 +28,14 @@ wayland_util_dep = declare_dependency(
 
 if get_option('scanner')
 	# wayland-scanner
-
-	scanner_deps = [ dependency('expat') ]
+        scanner_deps = []
 	scanner_args = [ '-include', 'config.h' ]
+
+	expat_dep = dependency('expat')
+	scanner_deps += expat_dep
+	if expat_dep.version().version_compare('>= 2.9.0')
+		scanner_args += '-DHAVE_EXPAT_64BIT_API=1'
+	endif
 
 	if get_option('dtd_validation')
 		scanner_deps += dependency('libxml-2.0')

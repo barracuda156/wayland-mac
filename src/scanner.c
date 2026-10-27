@@ -95,6 +95,26 @@ scanner_version(int ret)
 	exit(ret);
 }
 
+static uint32_t
+get_line_number(XML_Parser parser)
+{
+#ifdef HAVE_EXPAT_64BIT_API
+	return (uint32_t) XML_GetCurrentLineNumber64(parser);
+#else
+	return (uint32_t) XML_GetCurrentLineNumber(parser);
+#endif
+}
+
+static uint32_t
+get_column_number(XML_Parser parser)
+{
+#ifdef HAVE_EXPAT_64BIT_API
+	return (uint32_t) XML_GetCurrentColumnNumber64(parser);
+#else
+	return (uint32_t) XML_GetCurrentColumnNumber(parser);
+#endif
+}
+
 static bool
 is_dtd_valid(FILE *input, const char *filename)
 {
@@ -151,7 +171,7 @@ is_dtd_valid(FILE *input, const char *filename)
 
 struct location {
 	const char *filename;
-	int line_number;
+	uint32_t line_number;
 };
 
 struct description {
@@ -385,7 +405,7 @@ fail(struct location *loc, const char *msg, ...)
 	va_list ap;
 
 	va_start(ap, msg);
-	fprintf(stderr, "%s:%d: error: ",
+	fprintf(stderr, "%s:%" PRIu32 ": error: ",
 		loc->filename, loc->line_number);
 	vfprintf(stderr, msg, ap);
 	fprintf(stderr, "\n");
@@ -399,7 +419,7 @@ warn(struct location *loc, const char *msg, ...)
 	va_list ap;
 
 	va_start(ap, msg);
-	fprintf(stderr, "%s:%d: warning: ",
+	fprintf(stderr, "%s:%" PRIu32 ": warning: ",
 		loc->filename, loc->line_number);
 	vfprintf(stderr, msg, ap);
 	fprintf(stderr, "\n");
@@ -738,7 +758,7 @@ start_element(void *data, const char *element_name, const char **atts)
 	const char *frozen = NULL;
 	int i, version = 0;
 
-	ctx->loc.line_number = XML_GetCurrentLineNumber(ctx->parser);
+	ctx->loc.line_number = get_line_number(ctx->parser);
 	for (i = 0; atts[i]; i += 2) {
 		if (strcmp(atts[i], "name") == 0)
 			name = atts[i + 1];
@@ -2201,9 +2221,9 @@ int main(int argc, char *argv[])
 		}
 		if (XML_ParseBuffer(ctx.parser, len, len == 0) == 0) {
 			fprintf(stderr,
-				"Error parsing XML at line %ld col %ld: %s\n",
-				XML_GetCurrentLineNumber(ctx.parser),
-				XML_GetCurrentColumnNumber(ctx.parser),
+				"Error parsing XML at line %" PRIu32 " col %" PRIu32 ": %s\n",
+				get_line_number(ctx.parser),
+				get_column_number(ctx.parser),
 				XML_ErrorString(XML_GetErrorCode(ctx.parser)));
 			fclose(input);
 			exit(EXIT_FAILURE);
