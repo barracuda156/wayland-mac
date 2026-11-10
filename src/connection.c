@@ -1244,10 +1244,11 @@ wl_closure_invoke(struct wl_closure *closure, uint32_t flags,
 	}
 
 	if (!implementation[opcode]) {
-		wl_abort("listener function for opcode %u of %s is NULL\n",
+		wl_log("listener function for opcode %u of %s is NULL\n",
 			 opcode, target->interface->name);
+	} else {
+		ffi_call(&cif, implementation[opcode], NULL, ffi_args);
 	}
-	ffi_call(&cif, implementation[opcode], NULL, ffi_args);
 
 	wl_closure_clear_fds(closure);
 }
@@ -1289,7 +1290,6 @@ copy_fds_to_connection(struct wl_closure *closure,
 
 	return 0;
 }
-
 
 static uint32_t
 buffer_size_for_closure(struct wl_closure *closure)
