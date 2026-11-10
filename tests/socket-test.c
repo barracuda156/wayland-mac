@@ -51,7 +51,14 @@ static const char *
 require_xdg_runtime_dir(void)
 {
 	char *val = getenv("XDG_RUNTIME_DIR");
+#ifdef __APPLE__
+	if (!val || val[0] != '/') {
+		val = getenv("TMPDIR");
+	}
+	assert(val && val[0] == '/' && "set $XDG_RUNTIME_DIR or $TMPDIR to run this test");
+#else
 	assert(val && val[0] == '/' && "set $XDG_RUNTIME_DIR to run this test");
+#endif
 
 	return val;
 }

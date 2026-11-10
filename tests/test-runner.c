@@ -204,8 +204,15 @@ set_xdg_runtime_dir(void)
 static void
 rmdir_xdg_runtime_dir(void)
 {
-	const char *xrd_env = getenv("XDG_RUNTIME_DIR");
+	char *xrd_env = getenv("XDG_RUNTIME_DIR");
+#ifdef __APPLE__
+	if (!xrd_env || xrd_env[0] != '/') {
+		xrd_env = getenv("TMPDIR");
+	}
+	assert(xrd_env && xrd_env[0] == '/' && "No XDG_RUNTIME_DIR nor TMPDIR set");
+#else
 	assert(xrd_env && xrd_env[0] == '/' && "No XDG_RUNTIME_DIR set");
+#endif
 
 	/* rmdir may fail if some test didn't do clean up */
 	if (rmdir(xrd_env) == -1)

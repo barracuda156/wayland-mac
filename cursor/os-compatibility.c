@@ -123,7 +123,7 @@ int
 os_create_anonymous_file(off_t size)
 {
 	static const char template[] = "/wayland-cursor-shared-XXXXXX";
-	const char *path;
+	char *path;
 	char *name;
 	size_t name_size;
 	int fd;
@@ -156,6 +156,12 @@ os_create_anonymous_file(off_t size)
 #endif
 	{
 		path = getenv("XDG_RUNTIME_DIR");
+#ifdef __APPLE__
+		if (!path || path[0] != '/') {
+			path = getenv("TMPDIR");
+			fprintf(stderr, "Using TMPDIR=\"%s\" instead of XDG_RUNTIME_DIR\n", path);
+		}
+#endif
 		if (!path || path[0] != '/') {
 			errno = ENOENT;
 			return -1;

@@ -1160,7 +1160,7 @@ connect_to_socket(const char *name)
 {
 	struct sockaddr_un addr;
 	socklen_t size;
-	const char *runtime_dir;
+	char *runtime_dir;
 	int name_size, fd;
 	bool path_is_absolute;
 
@@ -1172,8 +1172,18 @@ connect_to_socket(const char *name)
 	path_is_absolute = name[0] == '/';
 
 	runtime_dir = getenv("XDG_RUNTIME_DIR");
+#ifdef __APPLE__
 	if (((!runtime_dir || runtime_dir[0] != '/') && !path_is_absolute)) {
+		runtime_dir = getenv("TMPDIR");
+		wl_log("Using TMPDIR=\"%s\" instead of XDG_RUNTIME_DIR\n", runtime_dir);
+	}
+#endif
+	if (((!runtime_dir || runtime_dir[0] != '/') && !path_is_absolute)) {
+#ifdef __APPLE__
+		wl_log("error: XDG_RUNTIME_DIR and/or TMPDIR are invalid or not set in the environment.\n");
+#else
 		wl_log("error: XDG_RUNTIME_DIR is invalid or not set in the environment.\n");
+#endif
 		/* to prevent programs reporting
 		 * "failed to create display: Success" */
 		errno = ENOENT;
